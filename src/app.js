@@ -92,28 +92,62 @@ function mostrarHistorial() {
   });
 }
 
-let consulta = 0;
-async function actualizar() {
-  mostrarHistorial(); mostrarResumen(calculoLocal());
-  const idConsulta = ++consulta;
+function actualizar() {
+  mostrarHistorial();
+  mostrarResumen(calculoLocal());
+}
+
+async function revisarAzure() {
   const estado = $('apiEstado');
-  estado.className = 'api'; estado.textContent = '● Consultando Azure Functions…';
   try {
-    const respuesta = await fetch('/api/resumen', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({movimientos})
-    });
-    if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
+    const respuesta = await fetch('/api/resumen', { cache: 'no-store' });
+    if (!respuesta.ok) throw new Error('Servicio no disponible');
     const datos = await respuesta.json();
-    if (idConsulta !== consulta) return;
-    if (![datos.ingresos, datos.gastos, datos.saldo].every(Number.isFinite)) throw new Error('Respuesta inválida');
-    mostrarResumen(datos);
-    estado.className = 'api ok'; estado.textContent = datos.almacenamiento === 'blob' ? '● Azure App Service + Blob Storage conectados' : '● Azure App Service conectado · configura Blob Storage para guardar resúmenes';
-  } catch (_) {
-    if (idConsulta !== consulta) return;
-    estado.className = 'api fail'; estado.textContent = '● API no disponible · cálculo local de respaldo';
+    const configurado = datos.almacenamiento === 'configurado';
+    estado.textContent = configurado ? 'Azure Blob Storage disponible' : 'Guardado en Azure pendiente de configurar';
+    $('accionesAzure').hidden = !configurado;
+    $('loginAzure').hidden = !configurado || datos.autorizado;
+    $('guardarAzure').hidden = !configurado || !datos.autorizado;
+    $('leerAzure').hidden = !configurado || !datos.autorizado;
+  } catch {
+    estado.textContent = 'Azure no disponible. Puedes seguir usando el panel local.';
   }
 }
+
+$('guardarAzure').addEventListener('click', async () => {
+  const mensaje = $('resumenAzure');
+  const boton = $('guardarAzure');
+  boton.disabled = true;
+  try {
+    const datos = movimientos.map(({ monto, tipo, categoria }) => ({ monto, tipo, categoria }));
+    const respuesta = await fetch('/api/almacenamiento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movimientos: datos })
+    });
+    mensaje.textContent = respuesta.ok ? 'Resumen guardado en Azure.' :
+      respuesta.status === 401 ? 'Vuelve a iniciar sesión para guardar.' : 'No se pudo guardar el resumen en Azure.';
+  } catch {
+    mensaje.textContent = 'No se pudo guardar el resumen en Azure.';
+  } finally {
+    boton.disabled = false;
+  }
+});
+
+$('leerAzure').addEventListener('click', async () => {
+  const mensaje = $('resumenAzure');
+  try {
+    const respuesta = await fetch('/api/almacenamiento', { cache: 'no-store' });
+    if (!respuesta.ok) throw new Error('Resumen no disponible');
+    const { ultimoResumen } = await respuesta.json();
+    mensaje.textContent = ultimoResumen ?
+      'Último resumen guardado. Ingresos ' + dinero(ultimoResumen.ingresos) +
+      ', gastos ' + dinero(ultimoResumen.gastos) + ', saldo ' + dinero(ultimoResumen.saldo) + '.' :
+      'Todavía no hay un resumen guardado.';
+  } catch {
+    mensaje.textContent = 'No se pudo consultar el resumen guardado.';
+  }
+});
 
 $('formMovimiento').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -149,3 +183,4 @@ $('vaciar').addEventListener('click', () => {
   movimientos = []; guardar(); actualizar();
 });
 actualizar();
+revisarAzure();
