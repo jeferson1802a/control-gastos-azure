@@ -108,7 +108,7 @@ async function actualizar() {
     if (idConsulta !== consulta) return;
     if (![datos.ingresos, datos.gastos, datos.saldo].every(Number.isFinite)) throw new Error('Respuesta inválida');
     mostrarResumen(datos);
-    estado.className = 'api ok'; estado.textContent = '● Azure Functions conectado · resumen calculado en la nube';
+    estado.className = 'api ok'; estado.textContent = datos.almacenamiento === 'blob' ? '● Azure App Service + Blob Storage conectados' : '● Azure App Service conectado · configura Blob Storage para guardar resúmenes';
   } catch (_) {
     if (idConsulta !== consulta) return;
     estado.className = 'api fail'; estado.textContent = '● API no disponible · cálculo local de respaldo';
