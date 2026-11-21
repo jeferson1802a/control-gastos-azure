@@ -2,32 +2,45 @@
 const express = require('express');
 const path = require('path');
 const { BlobServiceClient } = require('@azure/storage-blob');
+const { ManagedIdentityCredential } = require('@azure/identity');
 
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '200kb' }));
 
-const conexion = process.env.AZURE_STORAGE_CONNECTION_STRING;
-let contenedor = null;
-if (conexion) {
-  try {
-    const cliente = BlobServiceClient.fromConnectionString(conexion);
-    contenedor = cliente.getContainerClient('resumenes-demo');
-  } catch (e) {
-    console.error('Error de configuración de Blob Storage:', e.message);
-  }
+const endpoint = process.env.AZURE_BLOB_ENDPOINT;
+const cuentaAutorizada = process.env.AZURE_STORAGE_OWNER_UPN?.trim().toLowerCase();
+const contenedor = endpoint ? new BlobServiceClient(endpoint, new ManagedIdentityCredential())
+  .getContainerClient('resumenes-demo') : null;
+
+function puedeAcceder(req) {
+  return Boolean(cuentaAutorizada && req.get('X-MS-CLIENT-PRINCIPAL-ID') &&
+    req.get('X-MS-CLIENT-PRINCIPAL-IDP') === 'aad' &&
+    req.get('X-MS-CLIENT-PRINCIPAL-NAME')?.toLowerCase() === cuentaAutorizada);
 }
 
-app.get('/api/resumen', (_req, res) => {
+function protegerAlmacenamiento(req, res, next) {
+  res.set('Cache-Control', 'no-store');
+  if (!puedeAcceder(req)) return res.status(401).json({ error: 'Inicia sesión con la cuenta autorizada.' });
+  if (!contenedor) return res.status(503).json({ estado: 'no_configurado' });
+  next();
+}
+
+app.get('/api/resumen', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.json({
     estado: 'activo',
     servicio: 'Azure App Service',
-    almacenamiento: contenedor ? 'configurado' : 'sin configurar',
+    almacenamiento: contenedor && cuentaAutorizada ? 'configurado' : 'sin configurar',
+    autorizado: puedeAcceder(req),
     aplicacion: 'Mis Finanzas'
   });
 });
 
-app.post('/api/resumen', async (req, res) => {
+app.post('/api/resumen', (req, res) => calcularResumen(req, res, false));
+app.post('/api/almacenamiento', protegerAlmacenamiento, (req, res) => calcularResumen(req, res, true));
+
+async function calcularResumen(req, res, guardarEnAzure) {
   const lista = req.body?.movimientos;
   if (!Array.isArray(lista) || lista.length > 1000) {
     return res.status(400).json({ error: 'Lista inválida' });
@@ -55,7 +68,7 @@ app.post('/api/resumen', async (req, res) => {
     }
   }
 
-  const categorias = {};
+  const categorias = Object.create(null);
   for (const [nombre, centimos] of Object.entries(porCategoria)) {
     categorias[nombre] = centimos / 100;
   }
@@ -69,9 +82,8 @@ app.post('/api/resumen', async (req, res) => {
   };
 
   let almacenamiento = 'no_configurado';
-  if (contenedor) {
+  if (guardarEnAzure) {
     try {
-      await contenedor.createIfNotExists();
       const documento = JSON.stringify({
         ...resumen,
         actualizado: new Date().toISOString(),
@@ -85,15 +97,14 @@ app.post('/api/resumen', async (req, res) => {
       almacenamiento = 'blob';
     } catch (error) {
       console.error('No se pudo guardar en Blob Storage:', error.message);
-      almacenamiento = 'error';
+      return res.status(503).json({ error: 'No se pudo guardar el resumen en Azure.' });
     }
   }
 
   res.json({ ...resumen, almacenamiento, procesadoPor: 'Azure App Service' });
-});
+}
 
-app.get('/api/almacenamiento', async (_req, res) => {
-  if (!contenedor) return res.status(503).json({ estado: 'no_configurado' });
+app.get('/api/almacenamiento', protegerAlmacenamiento, async (_req, res) => {
   try {
     const blob = contenedor.getBlockBlobClient('ultimo-resumen.json');
     if (!(await blob.exists())) {
