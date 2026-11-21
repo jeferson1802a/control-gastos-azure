@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b37">
+  <meta name="description" content="Control de ingresos y gastos personales con Azure Static Web Apps y Azure Functions.">
+  <title>Mis Finanzas | Control de Gastos</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brandmark">◈</span><div>Mis Finanzas<small>Personal Budget</small></div></div>
+      <nav aria-label="Menú principal"><a class="navactive" href="#inicio">▦ <span>Resumen general</span></a><a href="#registrar">＋ <span>Nuevo movimiento</span></a><a href="#movimientos">≡ <span>Movimientos</span></a></nav>
+      <div class="sidebottom"><span class="statusdot"></span> Proyecto académico<br><small>Azure Static Web Apps + Functions</small></div>
+    </aside>
+    <div class="content">
+      <header class="topbar"><div><span class="eyebrow">PANEL FINANCIERO</span><h1 id="inicio">Control de gastos personales</h1><p>Organiza tus ingresos y gastos en un solo lugar.</p></div><div class="topbadge">PEN · Soles peruanos</div></header>
+      <main>
+        <section class="stats" aria-label="Resumen financiero">
+          <article class="stat"><div class="statheader"><span>Ingresos totales</span><span class="statbadge green">↗</span></div><strong id="totalIngresos">S/ 0.00</strong><small>Movimientos de ingreso</small></article>
+          <article class="stat"><div class="statheader"><span>Gastos totales</span><span class="statbadge red">↘</span></div><strong id="totalGastos">S/ 0.00</strong><small>Movimientos de gasto</small></article>
+          <article class="stat accent"><div class="statheader"><span>Saldo disponible</span><span class="statbadge light">◉</span></div><strong id="totalSaldo">S/ 0.00</strong><small>Ingresos menos gastos</small></article>
+        </section>
+        <div class="layout">
+          <section class="panel" id="registrar">
+            <div class="panelhead"><div><span class="eyebrow">ADMINISTRA TU DINERO</span><h2>Agregar movimiento</h2></div><span class="panelicon">＋</span></div>
+            <form id="formMovimiento">
+              <label for="concepto">Concepto</label><input id="concepto" type="text" maxlength="80" required placeholder="Ej. Compra de alimentos">
+              <div class="formgrid"><div><label for="tipo">Tipo de movimiento</label><select id="tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div><div><label for="monto">Monto (S/)</label><input id="monto" type="number" min="0.01" max="1000000000" step="0.01" required placeholder="0.00"></div></div>
+              <div class="formgrid"><div><label for="categoria">Categoría</label><select id="categoria"><option>Alimentación</option><option>Transporte</option><option>Estudios</option><option>Entretenimiento</option><option>Vivienda</option><option>Trabajo</option><option>Otros</option></select></div><div><label for="fecha">Fecha</label><input id="fecha" type="date" required></div></div>
+              <button class="primary" type="submit">＋ Registrar movimiento</button>
+            </form>
+            <p id="mensajes" class="help" role="status" aria-live="polite">Los movimientos se almacenan únicamente en este navegador.</p>
+          </section>
+          <section class="panel" id="categorias"><div class="panelhead"><div><span class="eyebrow">DISTRIBUCIÓN</span><h2>Gastos por categoría</h2></div><span class="panelicon">◔</span></div><div id="graficoCategorias" class="categorybars"><div class="empty">Registra un gasto para ver el gráfico.</div></div><div class="api" id="apiEstado" role="status">● Verificando Azure Functions…</div></section>
+        </div>
+        <section class="panel history" id="movimientos"><div class="panelhead historyhead"><div><span class="eyebrow">ACTIVIDAD RECIENTE</span><h2>Historial de movimientos</h2></div><div class="actions"><button type="button" id="demo" class="secondary">Cargar ejemplo</button><button type="button" id="vaciar" class="secondary dangeroutline">Borrar todo</button></div></div>
+          <div class="tablewrap"><table><thead><tr><th>FECHA</th><th>CONCEPTO</th><th>CATEGORÍA</th><th>TIPO</th><th class="right">MONTO</th><th></th></tr></thead><tbody id="tablaMovimientos"><tr><td colspan="6" class="empty">Aún no hay movimientos registrados.</td></tr></tbody></table></div>
+        </section>
+        <footer>Aplicación demostrativa · Azure Static Web Apps + Azure Functions · Datos guardados localmente</footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
