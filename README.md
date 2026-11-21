@@ -1,23 +1,41 @@
-# Mis Finanzas — Control de gastos personales en Azure
+# Mis Finanzas — Control de gastos personales en Microsoft Azure
 
-Aplicación académica para registrar ingresos y gastos en soles peruanos.
+Proyecto académico: **dos servicios integrados de Microsoft Azure**.
 
-## Servicios de Azure
-1. **Azure Static Web Apps:** publica la interfaz HTML, CSS y JavaScript por HTTPS.
-2. **Azure Functions (API integrada):** procesa los movimientos y calcula ingresos, gastos, saldo y distribución por categoría.
+- **Azure App Service (plan F1 Free):** ejecuta el sitio web y una API Node.js/Express.
+- **Azure Blob Storage (cuenta Storage):** la API guarda de manera privada el último resumen de demostración en el blob `resumenes-demo/ultimo-resumen.json`.
 
-La versión demo guarda los movimientos en localStorage del navegador. No uses datos financieros sensibles.
+El formulario permite registrar movimientos y ver ingresos, gastos, saldo e importes por categoría. Los movimientos individuales se mantienen en `localStorage` del navegador. La API guarda en Blob **únicamente un resumen numérico**, sin conceptos ni fechas. Es una demostración pública sin autenticación: no introduzcas información real o sensible.
 
-## Despliegue en Azure
-1. En portal.azure.com selecciona **Static Web Apps → Crear**.
-2. Elige la suscripción **Azure for Students** y el plan **Free**.
-3. Conecta GitHub, repositorio **jeferson1802a/control-gastos-azure**, rama **main**.
-4. Build preset: **Custom**. App location: **src**. API location: **api**. Output location: dejar vacío.
-5. Crea el recurso, comprueba en GitHub Actions que el despliegue termine correctamente y copia la URL pública desde Azure.
+## Pasos para desplegar
 
-## Pruebas
-Haz clic en **Cargar ejemplo**. Se esperan ingresos de S/ 2,500; gastos de S/ 560; saldo de S/ 1,940.
-El indicador debe mostrar **Azure Functions conectado**.
-La ruta **/api/resumen** muestra el estado de la API.
+1. Abre Azure Portal → **App Services → Crear → Aplicación web**.
+2. Suscripción: **Azure for Students**. Grupo de recursos: `rg-control-gastos`.
+3. Nombre: `mis-finanzas-web` (si está libre). **Código**, runtime **Node 20 LTS** (o una versión LTS disponible), **Windows**, región **Brazil South**, **Canada Central** o cualquiera de las autorizadas para tu suscripción.
+4. Selecciona el plan **Free F1** y verifica precio antes de continuar. Si F1 no está disponible en esa región, comprueba otra permitida; **no aceptes un plan pagado por error**.
+5. Revisa y crea. Cuando termine: App Service → **Centro de implementación / Deployment Center** → GitHub → `jeferson1802a/control-gastos-azure`, rama `main`. Guarda para iniciar el despliegue.
+6. Comprueba que la web se abra en la dirección generada por App Service, con dominio `azurewebsites.net`.
 
-**Nota:** la API integrada puede aparecer en Azure como un solo recurso de Static Web Apps, aunque use ambos servicios. Si tu docente exige dos recursos independientes, consulta esa condición antes de entregar.
+## Conectar Azure Blob Storage
+
+1. Azure Portal → **Cuentas de almacenamiento → Crear**. Usa la misma suscripción/grupo, región permitida, **StorageV2**, **Standard** y **LRS**. Revisa el precio: el almacenamiento puede consumir crédito si no está cubierto por una cuota gratuita.
+2. Dentro de la cuenta de almacenamiento, ve a **Claves de acceso → Mostrar → Cadena de conexión**. **No compartas la cadena ni la subas a GitHub.**
+3. App Service → **Variables de entorno / Configuración → Configuración de aplicación → Agregar**, nombre:
+   `AZURE_STORAGE_CONNECTION_STRING`
+   y pega la cadena de conexión en el campo valor. Guarda y reinicia la aplicación.
+4. Registra movimientos ficticios o haz clic en **Cargar ejemplo**. Se esperan ingresos S/ 2,500; gastos S/ 560; saldo S/ 1,940.
+5. Abre `https://<TU-DOMINIO>.azurewebsites.net/api/almacenamiento`. Debe mostrar `estado: conectado` y el último resumen guardado en Azure Blob Storage.
+
+## API
+- `GET /api/resumen`: comprobar el servicio.
+- `POST /api/resumen`: calcular totales de los movimientos y guardar resumen en Azure Blob Storage.
+- `GET /api/almacenamiento`: verificar que el blob existe y recuperar el último resumen.
+
+## Código
+- `server.js`: servidor de Azure App Service con API Express y conexión a Blob Storage.
+- `package.json`: dependencias e instrucción `npm start`.
+- `src/index.html`, `src/styles.css`, `src/app.js`: interfaz.
+- `api/`: variante anterior para Static Web Apps (no se utiliza en esta modalidad de App Service).
+
+## Seguridad y costos
+La API de demostración es pública y no dispone de autenticación. Nunca guardes datos bancarios reales en este proyecto. Los movimientos solo residen en tu navegador; el archivo de Blob Storage contiene totales de demostración que se sobrescriben. Los cargos dependen de las cuotas del plan y el consumo de almacenamiento. El servicio web debe configurarse con plan F1 gratis.
